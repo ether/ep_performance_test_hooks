@@ -42,7 +42,7 @@
   "version": "0.0.49",
   "devDependencies": {
     "eslint": "^8.57.1",
-    "eslint-config-etherpad": "^4.0.4",
+    "eslint-config-etherpad": "^4.0.5",
     "typescript": "^6.0.3"
   },
   "scripts": {
