@@ -20,6 +20,8 @@ test.describe('ep_performance_test_hooks', () => {
     expect(stats.ep_performance_test_hooks.etherpadHooks).toBeTruthy();
     expect(stats.ep_performance_test_hooks.loadTimes).toBeTruthy();
     expect(stats.ep_performance_test_hooks.loadSizes).toBeTruthy();
-    expect(stats.startDurations).toBeTruthy();
+    // startDurations was a top-level field in older Etherpad releases;
+    // newer releases drop it. Plugin only owns the ep_performance_test_hooks
+    // sub-tree, so don't gate the test on a core-side field.
   });
 });
