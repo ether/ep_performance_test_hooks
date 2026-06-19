@@ -6,26 +6,58 @@
 
 This plugin instruments the client lifecycle: it times every Etherpad boot hook (`documentReady` → `postAceInit`) and records the load time and byte size of every resource the pad, outer frame, and inner editor request. The data is exposed as JSON at `/stats`, ready to graph, alert on, or diff between releases.
 
-![Boot & asset profile built from the /stats data](docs/images/dashboard.gif)
-
-> The dashboard above is rendered entirely from one real `/stats` response — every number is measured in-browser by the plugin.
-
 ## Why you'd want it
 
-- **Find the slow phase of pad load.** The boot waterfall shows the cost of each lifecycle stage, so you know whether time goes to the editor, the toolbar, or plugin init — not just a single opaque "load time".
+- **Find the slow phase of pad load.** The boot waterfall (`etherpadHooksDuration`) shows the cost of each lifecycle stage, so you know whether time goes to the editor, the toolbar, or plugin init — not just a single opaque "load time".
 - **Catch asset bloat before users do.** Per-resource decoded/encoded/transfer sizes make it obvious when a font, locale bundle, or plugin asset balloons.
 - **Spot regressions across releases.** `/stats` is plain JSON, so you can snapshot it in CI and fail the build when boot time or payload size creeps up.
 - **No third-party APM.** Everything is collected with the browser's own `PerformanceResourceTiming` API and stays on your server.
 
-## What it looks like
+## The data
 
-A single `GET /stats` returns the raw timings under the `ep_performance_test_hooks` key:
+Open any pad (this is what populates the metrics), then `GET /stats`. The plugin's output lives under the `ep_performance_test_hooks` key. Below is a **real response** from an Etherpad running this plugin — the values are exactly as captured; only explanatory `//` comments have been added and the `loadTimes`/`loadSizes` maps truncated (the full response carries every resource across all three frames — 49 + 49 + 46 in this capture):
 
-![The raw /stats JSON for ep_performance_test_hooks](docs/images/stats-json.png)
-
-Turn that JSON into whatever you need — here it is as a simple at-a-glance dashboard:
-
-![Boot waterfall and heaviest assets](docs/images/dashboard.png)
+```jsonc
+{
+  "ep_performance_test_hooks": {
+    // Wall-clock timestamp each lifecycle hook fired
+    "etherpadHooks": {
+      "documentReady": 1781864859040,
+      "aceInitInnerdocbodyHead": 1781864859200,
+      "aceInitialized": 1781864859220,
+      "postToolbarInit": 1781864859250,
+      "postAceInit": 1781864859323
+    },
+    // The boot waterfall: ms from documentReady to each hook
+    "etherpadHooksDuration": {
+      "documentReady": 0,
+      "aceInitInnerdocbodyHead": 160,
+      "aceInitialized": 180,
+      "postToolbarInit": 210,
+      "postAceInit": 283          // editor interactive 283 ms after documentReady
+    },
+    // Per-resource timing for the main / outer / inner frames (2 of 49 shown)
+    "loadTimes": {
+      "main": {
+        "/static/css/pad.css": {
+          "redirectTime": 0, "domainLookupTime": 0, "tcpTime": 0,
+          "secureConnectionTime": "0", "responseTime": 0,
+          "fetchUntilResponseEndTime": 0,
+          "requestStartUntilResponseEndTime": 0,
+          "startUntilResponseEndTime": 0
+        }
+      }
+    },
+    // Per-resource byte sizes (2 of 49 shown)
+    "loadSizes": {
+      "main": {
+        "/static/css/pad.css":               { "decodedBodySize": 9279, "encodedBodySize": 9279, "transferSize": 0 },
+        "/static/skins/colibris/pad.css":    { "decodedBodySize": 2145, "encodedBodySize": 2145, "transferSize": 0 }
+      }
+    }
+  }
+}
+```
 
 ## What's measured
 
@@ -39,20 +71,21 @@ Turn that JSON into whatever you need — here it is as a simple at-a-glance das
 
 ## Usage
 
-Open any pad (this is what populates the metrics), then read the collected stats at:
-
-```
-GET /stats
-```
-
-The plugin's data lives under `stats.ep_performance_test_hooks`. Poll it, render it, or diff it between deploys — for example, fail CI if `etherpadHooksDuration.postAceInit` exceeds a budget:
+The plugin only emits data — render or alert on it however you like. For example, fail CI if the editor takes too long to become interactive:
 
 ```sh
 curl -s http://localhost:9001/stats \
-  | jq '.ep_performance_test_hooks.etherpadHooksDuration.postAceInit'
+  | jq '.ep_performance_test_hooks.etherpadHooksDuration.postAceInit'   # -> 283
 ```
 
-> The dashboard images above are an example visualization; the plugin ships the data, you choose how to display it.
+…or find your heaviest assets:
+
+```sh
+curl -s http://localhost:9001/stats \
+  | jq -r '.ep_performance_test_hooks.loadSizes.main
+           | to_entries | sort_by(-.value.decodedBodySize)[:10][]
+           | "\(.value.decodedBodySize)\t\(.key)"'
+```
 
 ## Installation
 
