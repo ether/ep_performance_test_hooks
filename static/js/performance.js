@@ -5,22 +5,29 @@
 // was false, it was only when minify was set to true that I needed to do this hack.
 // CRITICAL TODO: This causes a global leak which causes the tests to fail.
 
+// Lazily get (and create) the shared namespace. `documentReady` only fires on the
+// pad page (pad.html), never in the timeslider bootstrap, so hooks that also fire in
+// the timeslider (postToolbarInit, postTimesliderInit) used to throw
+// `TypeError: Cannot set properties of undefined` there. Those uncaught errors
+// surfaced as error toasts and broke core's timeslider specs. Ensuring the namespace
+// exists makes every hook safe regardless of which page fired it.
+const hooks = () => (window.top.etherpadHooks = window.top.etherpadHooks || {});
+
 exports.documentReady = () => {
-  window.top.etherpadHooks = {};
-  window.top.etherpadHooks.documentReady = Date.now();
+  hooks().documentReady = Date.now();
 };
-exports.aceAttribClasses = () => window.top.etherpadHooks.aceAttribClasses = Date.now();
-exports.aceEditorCSS = () => window.top.etherpadHooks.aceEditorCSS = Date.now();
+exports.aceAttribClasses = () => hooks().aceAttribClasses = Date.now();
+exports.aceEditorCSS = () => hooks().aceEditorCSS = Date.now();
 exports.aceInitInnerdocbodyHead =
-    () => window.top.etherpadHooks.aceInitInnerdocbodyHead = Date.now();
-exports.aceInitialized = () => window.top.etherpadHooks.aceInitialized = Date.now();
-exports.postToolbarInit = () => window.top.etherpadHooks.postToolbarInit = Date.now();
-exports.postTimesliderInit = () => window.top.etherpadHooks.postTimesliderInit = Date.now();
+    () => hooks().aceInitInnerdocbodyHead = Date.now();
+exports.aceInitialized = () => hooks().aceInitialized = Date.now();
+exports.postToolbarInit = () => hooks().postToolbarInit = Date.now();
+exports.postTimesliderInit = () => hooks().postTimesliderInit = Date.now();
 
 exports.postAceInit = () => {
-  window.top.etherpadHooks.postAceInit = Date.now();
+  hooks().postAceInit = Date.now();
   const perf = {};
-  perf.etherpadHooks = window.top.etherpadHooks;
+  perf.etherpadHooks = hooks();
   perf.etherpadHooksDuration = {};
 
   // Takes previous hook times and stores a duration
