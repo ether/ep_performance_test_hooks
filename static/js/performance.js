@@ -1,9 +1,8 @@
 'use strict';
 
-// It's hacky but we use window.top to ensure all the values are in the same namespace
-// TODO: make this less hacky.  Note that my initial solution worked fine when minify
-// was false, it was only when minify was set to true that I needed to do this hack.
-// CRITICAL TODO: This causes a global leak which causes the tests to fail.
+// Every client hook runs in the pad window, so the shared namespace lives there.
+// It used to live on window.top, which throws a SecurityError when the pad is
+// embedded in a page on another origin and stops the pad from loading.
 
 // Lazily get (and create) the shared namespace. `documentReady` only fires on the
 // pad page (pad.html), never in the timeslider bootstrap, so hooks that also fire in
@@ -11,7 +10,7 @@
 // `TypeError: Cannot set properties of undefined` there. Those uncaught errors
 // surfaced as error toasts and broke core's timeslider specs. Ensuring the namespace
 // exists makes every hook safe regardless of which page fired it.
-const hooks = () => (window.top.etherpadHooks = window.top.etherpadHooks || {});
+const hooks = () => (window.etherpadHooks = window.etherpadHooks || {});
 
 exports.documentReady = () => {
   hooks().documentReady = Date.now();
